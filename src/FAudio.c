@@ -583,6 +583,7 @@ uint32_t FAudio_CreateSourceVoice(
 				"xWMA is not supported by this build; voice %p will be silent",
 				(void*) *ppSourceVoice
 			)
+			FAudio_Log("FAUDIO: xWMA voice created silent (no decoder in this build)");
 			(*ppSourceVoice)->src.decode = FAudio_INTERNAL_DecodeWMAERROR;
 			(*ppSourceVoice)->src.samples_per_block = 1;
 #endif /* HAVE_WMADEC */
