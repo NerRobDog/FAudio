@@ -578,7 +578,13 @@ uint32_t FAudio_CreateSourceVoice(
 				return hr;
 			}
 #else
-			FAudio_assert(0 && "xWMA is not supported!");
+			LOG_ERROR(
+				audio,
+				"xWMA is not supported by this build; voice %p will be silent",
+				(void*) *ppSourceVoice
+			)
+			(*ppSourceVoice)->src.decode = FAudio_INTERNAL_DecodeWMAERROR;
+			(*ppSourceVoice)->src.samples_per_block = 1;
 #endif /* HAVE_WMADEC */
 		}
 		else
@@ -598,7 +604,13 @@ uint32_t FAudio_CreateSourceVoice(
 			return hr;
 		}
 #else
-		FAudio_assert(0 && "XMA2 is not supported!");
+		LOG_ERROR(
+			audio,
+			"XMA2 is not supported by this build; voice %p will be silent",
+			(void*) *ppSourceVoice
+		)
+		(*ppSourceVoice)->src.decode = FAudio_INTERNAL_DecodeWMAERROR;
+		(*ppSourceVoice)->src.samples_per_block = 1;
 #endif /* HAVE_WMADEC */
 	}
 	else if ((*ppSourceVoice)->src.format->wFormatTag == FAUDIO_FORMAT_MSADPCM)

@@ -1866,6 +1866,20 @@ void FAudio_INTERNAL_DecodePCM8(FAudioVoice *voice, const void *src,
 	LOG_FUNC_EXIT(voice->audio)
 }
 
+/* Formats this build has no decoder for. Without this, CreateSourceVoice leaves
+ * src.decode NULL and the mixer calls through it on the first block, which on a
+ * release build (where FAudio_assert compiles away) is a jump to address zero
+ * inside FAudio_INTERNAL_GenerateOutput. Decoding silence keeps the voice's
+ * lifetime, callbacks and timing intact; the sound is simply missing.
+ */
+void FAudio_INTERNAL_DecodeWMAERROR(FAudioVoice *voice, const void *src,
+	float *dst, uint32_t block_offset, uint32_t samples)
+{
+	LOG_FUNC_ENTER(voice->audio)
+	FAudio_zero(dst, sizeof(float) * samples * voice->src.format->nChannels);
+	LOG_FUNC_EXIT(voice->audio)
+}
+
 void FAudio_INTERNAL_DecodePCM16(FAudioVoice *voice, const void *src,
 	float *dst, uint32_t block_offset, uint32_t samples)
 {
