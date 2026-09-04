@@ -399,6 +399,14 @@ static uint32_t buffer_get_end(FAudioSourceVoice *voice, const struct queued_buf
 	}
 #endif
 
+	if (voice->src.decode == FAudio_INTERNAL_DecodeWMAERROR)
+	{
+		/* A compressed stream we have no decoder for. Its bytes do not map to
+		 * samples at all, so give it a length in samples and let it end; the
+		 * block arithmetic below is for block-aligned PCM and ADPCM only. */
+		return buffer->buffer.PlayBegin + (buffer->play_bytes / block_size);
+	}
+
 	if (buffer->buffer.LoopCount)
 		return buffer->buffer.LoopBegin + ((buffer->loop_bytes - buffer->first_block_offset) / block_size * samples_per_block);
 
@@ -418,6 +426,9 @@ static void save_unaligned_end_data(FAudioSourceVoice *voice, const struct queue
 	if (voice->src.wmadec)
 		return;
 #endif
+
+	if (voice->src.decode == FAudio_INTERNAL_DecodeWMAERROR)
+		return;
 
 	byte_pos = buffer->first_block_offset;
 	byte_pos += voice->src.curBufferOffset / samples_per_block * block_size;
@@ -592,6 +603,8 @@ static void try_collect_unaligned_data(FAudioSourceVoice *voice)
 	buffer = &voice->src.queued_buffers[0];
 	if (!voice->src.unaligned_size)
 		return;
+	if (voice->src.decode == FAudio_INTERNAL_DecodeWMAERROR)
+		return;
 
 	if (buffer->buffer.LoopCount)
 	{
@@ -668,6 +681,13 @@ static void FAudio_INTERNAL_DecodeBuffers(
 		}
 		else
 #endif
+		if (voice->src.decode == FAudio_INTERNAL_DecodeWMAERROR)
+		{
+			/* No decoder for this format: there is no source block to point at,
+			 * and the arithmetic below would walk off the buffer computing one. */
+			voice->src.decode(voice, NULL, dst, 0, decode_count);
+		}
+		else
 		{
 			uint32_t block_offset = voice->src.curBufferOffset % samples_per_block;
 			const uint8_t *src = buffer->buffer.pAudioData + buffer->first_block_offset;
