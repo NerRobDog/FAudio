@@ -2339,6 +2339,44 @@ uint32_t FACTCue_Play(FACTCue *pCue)
 		return FACTENGINE_E_INVALIDUSAGE;
 	}
 
+	/* An interactive cue plays the sound whose range contains the variable's
+	 * CURRENT value, starting at Play - not only once the variable moves.
+	 * Prepare deliberately leaves such a cue without a sound, and
+	 * FACT_INTERNAL_UpdateCue only builds one when the value differs from what
+	 * Prepare recorded, so a cue selected by a variable the title never writes
+	 * would otherwise report PLAYING and stay silent forever. Read the value
+	 * exactly as UpdateCue does and store it too, or UpdateCue's first tick
+	 * would see a change and tear this sound straight back down.
+	 */
+	if (	!(pCue->data->flags & CUE_FLAG_SINGLE_SOUND) &&
+		pCue->variation != NULL &&
+		pCue->variation->type == VARIATION_TABLE_TYPE_INTERACTIVE &&
+		pCue->playingSound == NULL &&
+		pCue->simpleWave == NULL	)
+	{
+		float value = 0.0f;
+		if (	pCue->parentBank->parentEngine->variables[
+				pCue->variation->variable
+			].accessibility & ACCESSIBILITY_CUE	)
+		{
+			FACTCue_GetVariable(
+				pCue,
+				pCue->variation->variable,
+				&value
+			);
+		}
+		else
+		{
+			FACTAudioEngine_GetGlobalVariable(
+				pCue->parentBank->parentEngine,
+				pCue->variation->variable,
+				&value
+			);
+		}
+		pCue->interactive = value;
+		create_sound(pCue);
+	}
+
 	if (!play_sound(pCue))
 	{
 		FAudio_PlatformUnlockMutex(
