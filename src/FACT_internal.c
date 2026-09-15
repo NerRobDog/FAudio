@@ -940,8 +940,34 @@ void FACT_INTERNAL_BeginFadeOut(FACTSoundInstance *sound, uint16_t fadeOutMS)
 	sound->parentCue->state |= FACT_STATE_STOPPING;
 }
 
+static inline void FACT_INTERNAL_StopTrack(const FACTTrack *track, FACTTrackInstance *trackInst, bool immediate);
+
+/* Same test as the Max RPC Release Time calculation in create_sound: a
+ * Volume RPC driven by the cue variable "ReleaseTime".
+ */
+static bool FACT_INTERNAL_HasReleaseRPC(
+	FACTAudioEngine *engine,
+	const struct rpc_codes *rpc_codes
+) {
+	FACTRPC *rpc;
+	for (uint8_t i = 0; i < rpc_codes->count; i += 1)
+	{
+		rpc = FACT_INTERNAL_GetRPC(engine, rpc_codes->codes[i]);
+		if (	rpc->parameter == RPC_PARAMETER_VOLUME &&
+			(engine->variables[rpc->variable].accessibility & ACCESSIBILITY_CUE) &&
+			FAudio_strcmp(engine->variableNames[rpc->variable], "ReleaseTime") == 0	)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void FACT_INTERNAL_BeginReleaseRPC(FACTSoundInstance *sound, uint16_t releaseMS)
 {
+	uint8_t i;
+	FACTAudioEngine *engine;
+
 	if (releaseMS == 0)
 	{
 		/* No release RPC? Screw it, just delete us */
@@ -952,6 +978,32 @@ void FACT_INTERNAL_BeginReleaseRPC(FACTSoundInstance *sound, uint16_t releaseMS)
 	sound->state = SOUND_STATE_RELEASE_RPC;
 	sound->fadeStart = FAudio_timems();
 	sound->fadeTarget = releaseMS;
+
+	/* The release window lasts as long as the longest ReleaseTime curve,
+	 * but only tracks carrying such a curve (or whose sound does) have a
+	 * release to play. Every other track would keep sounding, loops and
+	 * all, at full volume until the window closes -- Magicka's spray cues
+	 * rang on for five seconds after the cast was released. Stop those
+	 * tracks now, the way a sound with no release at all is stopped.
+	 * (Judgement: XACT's documentation says only that a stop "as authored"
+	 * plays the release phase the content sets up; it does not say what a
+	 * track without a release curve does meanwhile.)
+	 */
+	engine = sound->parentCue->parentBank->parentEngine;
+	if (!FACT_INTERNAL_HasReleaseRPC(engine, &sound->sound->rpc_codes))
+	{
+		for (i = 0; i < sound->sound->trackCount; i += 1)
+		{
+			if (!FACT_INTERNAL_HasReleaseRPC(engine, &sound->sound->tracks[i].rpc_codes))
+			{
+				FACT_INTERNAL_StopTrack(
+					&sound->sound->tracks[i],
+					&sound->tracks[i],
+					true
+				);
+			}
+		}
+	}
 
 	sound->parentCue->state |= FACT_STATE_STOPPING;
 }
