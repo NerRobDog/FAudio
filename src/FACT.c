@@ -2794,7 +2794,14 @@ uint32_t FACTCue_GetProperties(
 			FACTTrackProperties *track_props = &sndProps->arrTrackProperties[i];
 			FACTTrackInstance *track = &pCue->playingSound->tracks[i];
 
-			FAudio_assert(track->activeWave.wave);
+			/* A released cue stops the tracks its release curve does not
+			 * cover, and a finished one-shot has no wave either: report the
+			 * track zeroed instead of reading an uninitialised waveProps.
+			 */
+			if (track->activeWave.wave == NULL)
+			{
+				continue;
+			}
 			FACTWave_GetProperties(track->activeWave.wave, &waveProps);
 
 			track_props->duration = (waveProps.properties.durationInSamples * 1000)
